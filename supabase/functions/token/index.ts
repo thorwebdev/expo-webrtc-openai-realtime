@@ -1,5 +1,12 @@
+import { corsHeaders } from "../_shared/cors.ts";
+
 // Server-side API route to return an ephemeral realtime session token
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  // This is needed if you're planning to invoke your function from a browser.
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   // [Optional] Validate user is authenticated / paying user etc.
   const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
     method: "POST",
@@ -15,9 +22,7 @@ Deno.serve(async (_req) => {
 
   return new Response(r.body, {
     status: 200,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
 

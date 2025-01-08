@@ -1,10 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { Button, SafeAreaView, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Colors } from 'react-native/Libraries/NewAppScreen';
 import { supabase } from './utils/supabase';
 import { Audio } from 'expo-av';
-import { mediaDevices, RTCPeerConnection } from 'react-native-webrtc';
+import {
+  mediaDevices,
+  RTCPeerConnection,
+  MediaStream,
+  RTCView,
+} from 'react-native-webrtc-web-shim';
 
 const App = () => {
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -13,6 +17,11 @@ const App = () => {
     RTCPeerConnection['createDataChannel']
   >>(null);
   const peerConnection = useRef<null | RTCPeerConnection>(null);
+  const [localMediaStream, setLocalMediaStream] = useState<null | MediaStream>(
+    null
+  );
+  const remoteMediaStream = useRef<MediaStream>(new MediaStream());
+  const isVoiceOnly = true;
 
   async function startSession() {
     // Get an ephemeral key from the Supabase Edge Function:
@@ -26,11 +35,24 @@ const App = () => {
 
     // Create a peer connection
     const pc = new RTCPeerConnection();
+    // Set up some event listeners
+    pc.addEventListener('connectionstatechange', (e) => {
+      console.log('connectionstatechange', e);
+    });
+    pc.addEventListener('track', (event) => {
+      if (event.track) remoteMediaStream.current.addTrack(event.track);
+    });
 
     // Add local audio track for microphone input in the browser
     const ms = await mediaDevices.getUserMedia({
       audio: true,
     });
+    if (isVoiceOnly) {
+      let videoTrack = await ms.getVideoTracks()[0];
+      if (videoTrack) videoTrack.enabled = false;
+    }
+
+    setLocalMediaStream(ms);
     pc.addTrack(ms.getTracks()[0]);
 
     // Set up data channel for sending and receiving events
@@ -82,6 +104,7 @@ const App = () => {
         <View style={styles.footer}>
           <Button title="Start" onPress={startSession} />
           <Button title="Stop" onPress={stopSession} />
+          <RTCView stream={remoteMediaStream.current} style={styles.stream} />
         </View>
       </SafeAreaView>
     </>
@@ -90,18 +113,15 @@ const App = () => {
 
 const styles = StyleSheet.create({
   body: {
-    backgroundColor: Colors.white,
-    ...StyleSheet.absoluteFill,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stream: {
     flex: 1,
   },
   footer: {
-    backgroundColor: Colors.lighter,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    backgroundColor: '#fff',
   },
 });
 
