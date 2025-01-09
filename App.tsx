@@ -9,6 +9,7 @@ import {
   MediaStream,
   RTCView,
 } from 'react-native-webrtc-web-shim';
+import clientTools from './utils/tools';
 
 const App = () => {
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -100,15 +101,62 @@ const App = () => {
 
   // Attach event listeners to the data channel when a new one is created
   useEffect(() => {
+    function configureTools() {
+      console.log('Configuring the client side tools');
+      const event = {
+        type: 'session.update',
+        session: {
+          modalities: ['text', 'audio'],
+          instructions:
+            'You are a helpful assistant. You have access to certain tools that allow you to check the user device battery level and change the display brightness. Use these tolls if the user asks about them. Otherwise, just answer the question.',
+          // Provide the tools. Note they match the keys in the `clientTools` object above.
+          tools: [
+            {
+              type: 'function',
+              name: 'getBatteryLevel',
+              description:
+                'Gets the device battery level as decimal point percentage.',
+            },
+          ],
+        },
+      };
+      dataChannel.send(JSON.stringify(event));
+    }
+
     if (dataChannel) {
       // Append new server events to the list
       // TODO: load types from OpenAI SDK.
-      dataChannel.addEventListener('message', (e: any) => {
+      dataChannel.addEventListener('message', async (e: any) => {
         const data = JSON.parse(e.data);
         console.log('dataChannel message', data);
         setEvents((prev) => [data, ...prev]);
+        // Get transcript.
         if (data.type === 'response.audio_transcript.done') {
           setTranscript(data.transcript);
+        }
+        // Handle function calls
+        if (data.type === 'response.function_call_arguments.done') {
+          // TODO: improve types.
+          const functionName: keyof typeof clientTools = data.name;
+          const tool: any = clientTools[functionName];
+          if (tool !== undefined) {
+            console.log(
+              `Calling local function ${data.name} with ${data.arguments}`
+            );
+            const args = JSON.parse(data.arguments);
+            const result = await tool(args);
+            console.log('result', result);
+            // Let OpenAI know that the function has been called and share it's output
+            const event = {
+              type: 'conversation.item.create',
+              item: {
+                type: 'function_call_output',
+                call_id: data.call_id, // call_id from the function_call message
+                output: JSON.stringify(result), // result of the function
+              },
+            };
+            dataChannel.send(JSON.stringify(event));
+          }
         }
       });
 
@@ -116,6 +164,8 @@ const App = () => {
       dataChannel.addEventListener('open', () => {
         setIsSessionActive(true);
         setEvents([]);
+        // Configure the client side tools
+        configureTools();
       });
     }
   }, [dataChannel]);
