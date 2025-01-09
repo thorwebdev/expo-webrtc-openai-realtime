@@ -9,9 +9,21 @@ import {
   MediaStream,
   RTCView,
 } from 'react-native-webrtc-web-shim';
-import clientTools from './utils/tools';
+import { clientTools, clientToolsSchema } from './utils/tools';
+
+import * as Brightness from 'expo-brightness';
 
 const App = () => {
+  useEffect(() => {
+    (async () => {
+      const { status } = await Brightness.requestPermissionsAsync();
+      console.log('brightness status', status);
+      // if (status === 'granted') {
+      //   Brightness.setSystemBrightnessAsync(0);
+      // }
+    })();
+  }, []);
+
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
   const [transcript, setTranscript] = useState('');
@@ -110,14 +122,7 @@ const App = () => {
           instructions:
             'You are a helpful assistant. You have access to certain tools that allow you to check the user device battery level and change the display brightness. Use these tolls if the user asks about them. Otherwise, just answer the question.',
           // Provide the tools. Note they match the keys in the `clientTools` object above.
-          tools: [
-            {
-              type: 'function',
-              name: 'getBatteryLevel',
-              description:
-                'Gets the device battery level as decimal point percentage.',
-            },
-          ],
+          tools: clientToolsSchema,
         },
       };
       dataChannel.send(JSON.stringify(event));
@@ -156,6 +161,12 @@ const App = () => {
               },
             };
             dataChannel.send(JSON.stringify(event));
+            // Force a response to the user
+            dataChannel.send(
+              JSON.stringify({
+                type: 'response.create',
+              })
+            );
           }
         }
       });

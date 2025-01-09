@@ -23,7 +23,8 @@
     "react-native-web": "~0.19.13",
     "react-native-webrtc": "^124.0.4",
     "react-native-webrtc-web-shim": "^1.0.7",
-    "expo-battery": "~9.0.1"
+    "expo-battery": "~9.0.1",
+    "expo-brightness": "~13.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
