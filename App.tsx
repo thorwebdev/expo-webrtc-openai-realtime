@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Button, SafeAreaView, StyleSheet, View } from 'react-native';
+import { Button, SafeAreaView, StyleSheet, View, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './utils/supabase';
 import { Audio } from 'expo-av';
@@ -13,6 +13,7 @@ import {
 const App = () => {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
+  const [transcript, setTranscript] = useState('');
   const [dataChannel, setDataChannel] = useState<null | ReturnType<
     RTCPeerConnection['createDataChannel']
   >>(null);
@@ -101,9 +102,14 @@ const App = () => {
   useEffect(() => {
     if (dataChannel) {
       // Append new server events to the list
-      dataChannel.addEventListener('message', (e) => {
-        console.log('dataChannel message', JSON.parse(e.data));
-        setEvents((prev) => [JSON.parse(e.data), ...prev]);
+      // TODO: load types from OpenAI SDK.
+      dataChannel.addEventListener('message', (e: any) => {
+        const data = JSON.parse(e.data);
+        console.log('dataChannel message', data);
+        setEvents((prev) => [data, ...prev]);
+        if (data.type === 'response.audio_transcript.done') {
+          setTranscript(data.transcript);
+        }
       });
 
       // Set session active when the data channel is opened
@@ -117,8 +123,8 @@ const App = () => {
   return (
     <>
       <StatusBar style="auto" />
-      <SafeAreaView style={styles.body}>
-        <View style={styles.footer}>
+      <SafeAreaView style={styles.container}>
+        <View>
           {!isSessionActive ? (
             <Button
               title="Start"
@@ -132,25 +138,22 @@ const App = () => {
               disabled={!isSessionActive}
             />
           )}
-          <RTCView stream={remoteMediaStream.current} style={styles.stream} />
+          <RTCView stream={remoteMediaStream.current} />
         </View>
+        <Text style={styles.text}>{transcript}</Text>
       </SafeAreaView>
     </>
   );
 };
 
 const styles = StyleSheet.create({
-  body: {
+  container: {
+    flex: 1,
     backgroundColor: '#fff',
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'center',
   },
-  stream: {
-    flex: 1,
-  },
-  footer: {
-    backgroundColor: '#fff',
-  },
+  text: { textAlign: 'center' },
 });
 
 export default App;
