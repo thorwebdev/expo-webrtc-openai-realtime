@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     justifyContent: 'center',
   },
-  text: { textAlign: 'center' },
+  text: { textAlign: 'center', fontSize: 88 },
 });
 
 export default App;

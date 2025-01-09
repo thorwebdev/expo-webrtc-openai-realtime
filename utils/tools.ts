@@ -22,6 +22,11 @@ const clientToolsSchema = [
       },
     },
   },
+  {
+    type: "function",
+    name: "flashScreen",
+    description: "Quickly flashes the screen on and off.",
+  },
 ];
 
 const clientTools: Record<string, any> = {
@@ -38,6 +43,13 @@ const clientTools: Record<string, any> = {
   changeBrightness: ({ brightness }: { brightness: number }) => {
     Brightness.setSystemBrightnessAsync(brightness);
     return { success: true, brightness };
+  },
+  flashScreen: () => {
+    Brightness.setSystemBrightnessAsync(1);
+    setTimeout(() => {
+      Brightness.setSystemBrightnessAsync(0);
+    }, 200);
+    return { success: true };
   },
 };
 
