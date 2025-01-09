@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button, SafeAreaView, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './utils/supabase';
@@ -12,7 +12,7 @@ import {
 
 const App = () => {
   const [isSessionActive, setIsSessionActive] = useState(false);
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [dataChannel, setDataChannel] = useState<null | ReturnType<
     RTCPeerConnection['createDataChannel']
   >>(null);
@@ -97,13 +97,41 @@ const App = () => {
     peerConnection.current = null;
   }
 
+  // Attach event listeners to the data channel when a new one is created
+  useEffect(() => {
+    if (dataChannel) {
+      // Append new server events to the list
+      dataChannel.addEventListener('message', (e) => {
+        console.log('dataChannel message', JSON.parse(e.data));
+        setEvents((prev) => [JSON.parse(e.data), ...prev]);
+      });
+
+      // Set session active when the data channel is opened
+      dataChannel.addEventListener('open', () => {
+        setIsSessionActive(true);
+        setEvents([]);
+      });
+    }
+  }, [dataChannel]);
+
   return (
     <>
       <StatusBar style="auto" />
       <SafeAreaView style={styles.body}>
         <View style={styles.footer}>
-          <Button title="Start" onPress={startSession} />
-          <Button title="Stop" onPress={stopSession} />
+          {!isSessionActive ? (
+            <Button
+              title="Start"
+              onPress={startSession}
+              disabled={isSessionActive}
+            />
+          ) : (
+            <Button
+              title="Stop"
+              onPress={stopSession}
+              disabled={!isSessionActive}
+            />
+          )}
           <RTCView stream={remoteMediaStream.current} style={styles.stream} />
         </View>
       </SafeAreaView>
