@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button, SafeAreaView, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import AudioVizDOMComponent from './components/audio-visualizer';
 import { supabase } from './utils/supabase';
 import { Audio } from 'expo-av';
 import {
@@ -117,8 +118,8 @@ const App = () => {
   return (
     <>
       <StatusBar style="auto" />
-      <SafeAreaView style={styles.body}>
-        <View style={styles.footer}>
+      <SafeAreaView style={styles.container}>
+        <View>
           {!isSessionActive ? (
             <Button
               title="Start"
@@ -132,7 +133,15 @@ const App = () => {
               disabled={!isSessionActive}
             />
           )}
-          <RTCView stream={remoteMediaStream.current} style={styles.stream} />
+          <RTCView stream={remoteMediaStream.current} />
+        </View>
+        <View>
+          {isSessionActive && (
+            <AudioVizDOMComponent
+              dom={{ matchContents: true }}
+              audio={remoteMediaStream.current}
+            />
+          )}
         </View>
       </SafeAreaView>
     </>
@@ -140,16 +149,11 @@ const App = () => {
 };
 
 const styles = StyleSheet.create({
-  body: {
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stream: {
+  container: {
     flex: 1,
-  },
-  footer: {
     backgroundColor: '#fff',
+    alignItems: 'stretch',
+    justifyContent: 'center',
   },
 });
 
