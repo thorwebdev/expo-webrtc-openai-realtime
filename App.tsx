@@ -141,7 +141,7 @@ const App = () => {
       dataChannel.addEventListener("message", async (e: any) => {
         const data = JSON.parse(e.data);
         console.log("dataChannel message", data);
-        // Prevent microphone capturing device sound (response) in Android
+        //Mute Microphone in Android while assistant is responding.
         if (Platform.OS === "android") {
           if (data.type === "output_audio_buffer.started") {
             localMediaStream.getAudioTracks()[0].enabled = false;
