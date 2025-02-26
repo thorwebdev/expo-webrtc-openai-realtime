@@ -1,23 +1,30 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Button, SafeAreaView, StyleSheet, View, Text } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { supabase } from './utils/supabase';
-import { Audio } from 'expo-av';
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Button,
+  SafeAreaView,
+  StyleSheet,
+  View,
+  Text,
+  Platform,
+} from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { supabase } from "./utils/supabase";
+import { Audio } from "expo-av";
 import {
   mediaDevices,
   RTCPeerConnection,
   MediaStream,
   RTCView,
-} from 'react-native-webrtc-web-shim';
-import { clientTools, clientToolsSchema } from './utils/tools';
+} from "react-native-webrtc-web-shim";
+import { clientTools, clientToolsSchema } from "./utils/tools";
 
-import * as Brightness from 'expo-brightness';
+import * as Brightness from "expo-brightness";
 
 const App = () => {
   useEffect(() => {
     (async () => {
       const { status } = await Brightness.requestPermissionsAsync();
-      console.log('brightness status', status);
+      console.log("brightness status", status);
       // if (status === 'granted') {
       //   Brightness.setSystemBrightnessAsync(0);
       // }
@@ -26,9 +33,9 @@ const App = () => {
 
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
-  const [transcript, setTranscript] = useState('');
+  const [transcript, setTranscript] = useState("");
   const [dataChannel, setDataChannel] = useState<null | ReturnType<
-    RTCPeerConnection['createDataChannel']
+    RTCPeerConnection["createDataChannel"]
   >>(null);
   const peerConnection = useRef<null | RTCPeerConnection>(null);
   const [localMediaStream, setLocalMediaStream] = useState<null | MediaStream>(
@@ -39,10 +46,10 @@ const App = () => {
 
   async function startSession() {
     // Get an ephemeral key from the Supabase Edge Function:
-    const { data, error } = await supabase.functions.invoke('token');
+    const { data, error } = await supabase.functions.invoke("token");
     if (error) throw error;
     const EPHEMERAL_KEY = data.client_secret.value;
-    console.log('token response', EPHEMERAL_KEY);
+    console.log("token response", EPHEMERAL_KEY);
 
     // Enable audio
     await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
@@ -50,10 +57,10 @@ const App = () => {
     // Create a peer connection
     const pc = new RTCPeerConnection();
     // Set up some event listeners
-    pc.addEventListener('connectionstatechange', (e) => {
-      console.log('connectionstatechange', e);
+    pc.addEventListener("connectionstatechange", (e) => {
+      console.log("connectionstatechange", e);
     });
-    pc.addEventListener('track', (event) => {
+    pc.addEventListener("track", (event) => {
       if (event.track) remoteMediaStream.current.addTrack(event.track);
     });
 
@@ -70,26 +77,26 @@ const App = () => {
     pc.addTrack(ms.getTracks()[0]);
 
     // Set up data channel for sending and receiving events
-    const dc = pc.createDataChannel('oai-events');
+    const dc = pc.createDataChannel("oai-events");
     setDataChannel(dc);
 
     // Start the session using the Session Description Protocol (SDP)
     const offer = await pc.createOffer({});
     await pc.setLocalDescription(offer);
 
-    const baseUrl = 'https://api.openai.com/v1/realtime';
-    const model = 'gpt-4o-realtime-preview-2024-12-17';
+    const baseUrl = "https://api.openai.com/v1/realtime";
+    const model = "gpt-4o-realtime-preview-2024-12-17";
     const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
-      method: 'POST',
+      method: "POST",
       body: offer.sdp,
       headers: {
         Authorization: `Bearer ${EPHEMERAL_KEY}`,
-        'Content-Type': 'application/sdp',
+        "Content-Type": "application/sdp",
       },
     });
 
     const answer = {
-      type: 'answer',
+      type: "answer",
       sdp: await sdpResponse.text(),
     };
     await pc.setRemoteDescription(answer);
@@ -114,13 +121,13 @@ const App = () => {
   // Attach event listeners to the data channel when a new one is created
   useEffect(() => {
     function configureTools() {
-      console.log('Configuring the client side tools');
+      console.log("Configuring the client side tools");
       const event = {
-        type: 'session.update',
+        type: "session.update",
         session: {
-          modalities: ['text', 'audio'],
+          modalities: ["text", "audio"],
           instructions:
-            'You are a helpful assistant. You have access to certain tools that allow you to check the user device battery level and change the display brightness. Use these tolls if the user asks about them. Otherwise, just answer the question.',
+            "You are a helpful assistant. You have access to certain tools that allow you to check the user device battery level and change the display brightness. Use these tolls if the user asks about them. Otherwise, just answer the question.",
           // Provide the tools. Note they match the keys in the `clientTools` object above.
           tools: clientToolsSchema,
         },
@@ -131,16 +138,25 @@ const App = () => {
     if (dataChannel) {
       // Append new server events to the list
       // TODO: load types from OpenAI SDK.
-      dataChannel.addEventListener('message', async (e: any) => {
+      dataChannel.addEventListener("message", async (e: any) => {
         const data = JSON.parse(e.data);
-        console.log('dataChannel message', data);
+        console.log("dataChannel message", data);
+        // Prevent microphone capturing device sound (response) in Android
+        if (Platform.OS === "android") {
+          if (data.type === "output_audio_buffer.started") {
+            localMediaStream.getAudioTracks()[0].enabled = false;
+          }
+          if (data.type === "output_audio_buffer.stopped") {
+            localMediaStream.getAudioTracks()[0].enabled = true;
+          }
+        }
         setEvents((prev) => [data, ...prev]);
         // Get transcript.
-        if (data.type === 'response.audio_transcript.done') {
+        if (data.type === "response.audio_transcript.done") {
           setTranscript(data.transcript);
         }
         // Handle function calls
-        if (data.type === 'response.function_call_arguments.done') {
+        if (data.type === "response.function_call_arguments.done") {
           // TODO: improve types.
           const functionName: keyof typeof clientTools = data.name;
           const tool: any = clientTools[functionName];
@@ -150,12 +166,12 @@ const App = () => {
             );
             const args = JSON.parse(data.arguments);
             const result = await tool(args);
-            console.log('result', result);
+            console.log("result", result);
             // Let OpenAI know that the function has been called and share it's output
             const event = {
-              type: 'conversation.item.create',
+              type: "conversation.item.create",
               item: {
-                type: 'function_call_output',
+                type: "function_call_output",
                 call_id: data.call_id, // call_id from the function_call message
                 output: JSON.stringify(result), // result of the function
               },
@@ -164,7 +180,7 @@ const App = () => {
             // Force a response to the user
             dataChannel.send(
               JSON.stringify({
-                type: 'response.create',
+                type: "response.create",
               })
             );
           }
@@ -172,7 +188,7 @@ const App = () => {
       });
 
       // Set session active when the data channel is opened
-      dataChannel.addEventListener('open', () => {
+      dataChannel.addEventListener("open", () => {
         setIsSessionActive(true);
         setEvents([]);
         // Configure the client side tools
@@ -210,11 +226,11 @@ const App = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'stretch',
-    justifyContent: 'center',
+    backgroundColor: "#fff",
+    alignItems: "stretch",
+    justifyContent: "center",
   },
-  text: { textAlign: 'center', fontSize: 88 },
+  text: { textAlign: "center", fontSize: 88 },
 });
 
 export default App;
